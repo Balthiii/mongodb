@@ -212,3 +212,163 @@ Index sur ISBN et email : Ces champs doivent être uniques, et un index unique g
 
 Index composite sur prix et note_moyenne : Pour optimiser les recherches par plage de prix et de note, un index composite sur ces deux champs serait très utile.
 
+# TP 2 : Requêtes géospatiales
+
+## Exercice 2.1 : Enrichissement des données
+
+1. Modifiez le schéma de vos utilisateurs pour inclure des coordonnées géographiques dans leur
+adresse. Utilisez le format GeoJSON Point.
+
+```
+db.utilisateurs.updateMany(
+  {nom :"Rousseau"},  
+  {
+    $set: {
+      "adresse.localisation": {
+        type: "Point",
+        coordinates: [28.7249, 73.7814]
+      }
+    }
+  }
+)
+```
+2. Créez une nouvelle collection bibliotheques avec au moins 3 bibliothèques dans différentes villes.
+Chaque document doit contenir.  
+
+```
+db.bibliotheques.insertMany([
+  {
+    nom: "Bibliothèque de Lyon Part-Dieu",
+    adresse: {
+      rue: "30 Boulevard Marius Vivier Merle",
+      ville: "Lyon",
+      code_postal: "69003"
+    },
+    localisation: {
+      type: "Point",
+      coordinates: [4.8557, 45.7580]  // Coordonnées de Lyon Part-Dieu (longitude, latitude)
+    },
+    zone_service: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [4.8550, 45.7575],
+          [4.8570, 45.7575],
+          [4.8570, 45.7585],
+          [4.8550, 45.7585],
+          [4.8550, 45.7575]
+        ]
+      ]
+    }
+  },
+  {
+    nom: "Bibliothèque François Mitterrand",
+    adresse: {
+      rue: "Quai François Mauriac",
+      ville: "Paris",
+      code_postal: "75013"
+    },
+    localisation: {
+      type: "Point",
+      coordinates: [2.3730, 48.8342]  // Coordonnées de Paris Bibliothèque François Mitterrand
+    },
+    zone_service: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [2.3720, 48.8340],
+          [2.3740, 48.8340],
+          [2.3740, 48.8350],
+          [2.3720, 48.8350],
+          [2.3720, 48.8340]
+        ]
+      ]
+    }
+  },
+  {
+    nom: "Bibliothèque Municipale de Marseille",
+    adresse: {
+      rue: "2 Boulevard des Dames",
+      ville: "Marseille",
+      code_postal: "13002"
+    },
+    localisation: {
+      type: "Point",
+      coordinates: [5.3774, 43.2965]  // Coordonnées de Marseille
+    },
+    zone_service: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [5.3765, 43.2960],
+          [5.3785, 43.2960],
+          [5.3785, 43.2970],
+          [5.3765, 43.2970],
+          [5.3765, 43.2960]
+        ]
+      ]
+    }
+  }
+])
+
+```
+
+3. Créez les index géospatiaux nécessaires sur les collections utilisateurs et bibliotheques.
+```
+db.utilisateurs.createIndex({ "adresse.localisation": "2dsphere" });
+
+```
+```
+db.bibliotheques.createIndex({ localisation: "2dsphere" });
+```
+## Exercice 2.2 : Requêtes de proximité
+
+1. Trouvez les 5 utilisateurs les plus proches d'un point donné (par exemple, le centre de Paris) dans un
+rayon de 5km
+```
+db.utilisateurs.find({
+  "adresse.localisation": {
+    $geoWithin: {
+      $centerSphere: [
+        [56.5674, 19.7400],
+        5 / 6378.1,
+      ],
+    },
+  },
+});
+```
+
+2. Trouvez les bibliothèques les plus proches d'un utilisateur spécifique.
+```
+db.bibliotheques.find({
+    localisation: {
+      $nearSphere: {
+        $geometry: {
+          type: "Point",
+          coordinates: [56.5675, 19.7539]
+        },
+        $maxDistance: 5000 // Limite de distance en mètres (5 km ici)
+      }
+    }
+  });
+  
+```
+
+3. Utilisez l'opérateur $geoNear dans un pipeline d'agrégation pour obtenir les bibliothèques triées par
+distance et calculer précisément cette distance (en km).
+
+```
+db.bibliotheques.aggregate([
+    {
+      $geoNear: {
+        near: { type: "Point", coordinates: [2.3522, 48.8566] },
+        distanceField: "distance",
+        maxDistance: 500000,
+        spherical: true
+      }
+    },
+    {
+      $sort: { distance: 1 } 
+    }
+  ]);
+```
