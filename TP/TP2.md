@@ -51,7 +51,9 @@ stock : { $gt: 0}
 
 ```
 db.ecommerce_produit.find ({
-    avis : {$size : 3}
+    $expr : {
+            $gte : [ {$sive : $avis}]
+    }
 })
 ```
 
