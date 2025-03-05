@@ -372,3 +372,188 @@ db.bibliotheques.aggregate([
     }
   ]);
 ```
+## Exercice 2.3 : Requêtes géospatiales avancées
+
+1. Utilisez $geoWithin pour trouver tous les utilisateurs à l'intérieur d'une zone définie par un
+polygone (par exemple, un quartier de Paris).
+
+```
+db.utilisateurs.find({
+  localisation: {
+    $geoWithin: {
+      $geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [2.32, 48.87],
+            [2.38, 48.87],
+            [2.38, 48.83],
+            [2.32, 48.83],
+            [2.32, 48.87],
+          ],
+        ],
+      },
+    },
+  },
+});
+
+```
+2. Trouvez tous les utilisateurs qui se trouvent dans la zone de service d'une bibliothèque spécifique.
+
+```
+const biblio = db.bibliotheques.findOne({ nom: "Bibliothèque de Lyon Part-Dieu" });
+
+```
+```
+db.utilisateurs.find({
+  localisation: {
+    $geoWithin: {
+      $geometry: biblio.zone_service
+    }
+  }
+});
+
+```
+
+3. Créez une collection rues avec au moins une rue représentée comme un LineString GeoJSON, puis
+utilisez $geoIntersects pour trouver les bibliothèques dont la zone de service intersecte cette rue.
+
+```
+db.rues.insertMany([
+  {
+    nom: "Avenue des Champs-Élysées",
+    tracé: {
+      type: "LineString",
+      coordinates: [
+        [2.3076, 48.8698], // Début de l'avenue
+        [2.3163, 48.8738], // Milieu
+        [2.3272, 48.8748]  // Fin de l'avenue
+      ]
+    }
+  },
+  {
+    nom: "Boulevard Saint-Michel",
+    tracé: {
+      type: "LineString",
+      coordinates: [
+        [2.3424, 48.8503],
+        [2.3435, 48.8538],
+        [2.3456, 48.8572]
+      ]
+    }
+  },
+  {
+    nom: "Rue de Rivoli",
+    tracé: {
+      type: "LineString",
+      coordinates: [
+        [2.3281, 48.8605],
+        [2.3346, 48.8609],
+        [2.3413, 48.8613]
+      ]
+    }
+  }
+]);
+
+```
+```
+db.bibliotheques.find({
+  zone_service: {
+    $geoIntersects: {
+      $geometry: {
+        type: "LineString",
+        coordinates: [
+          [2.3076, 48.8698],
+          [2.3163, 48.8738], 
+          [2.3272, 48.8748] 
+        ],
+      },
+    },
+  },
+});
+
+```
+## Exercice 2.4 : Cas d'utilisation métier
+
+1. Créez une collection livraisons
+```
+db.livraisons.insertOne(
+  {
+    utilisateur_id: ObjectId("67c7523ac13133e1feb21e6a"), 
+    livre_id: ObjectId("67c71dbfd68f87729363ae53"),
+    depart: {
+      type: "Point",
+      coordinates: [4.8557, 45.758] 
+    },
+    arrivee: {
+      type: "Point",
+      coordinates: [2.35, 48.85] 
+    },
+    position_actuelle: {
+      type: "Point",
+      coordinates: [2.351, 48.8602] 
+    },
+    itineraire: {
+      type: "LineString",
+      coordinates: [
+        [2.3522, 48.8566], 
+        [2.3510, 48.8585],
+        [2.3505, 48.8600],
+        [2.3499, 48.8641]
+      ]
+    },
+    statut: "En cours",
+    date_livraison: ISODate("2025-03-05T10:30:00Z") 
+  }
+);
+
+```
+
+2. Implémentez une fonction pour mettre à jour la position d'une livraison.
+
+```
+function updatePositionLivraison(livraisonId, nouvellePosition) {
+  db.livraisons.updateOne(
+    { _id: ObjectId("67c7ebce75599966318d30be") }, 
+    { 
+      $set: {
+        position_actuelle: {
+          type: "Point",
+          coordinates: [2.33,48.83]
+        }
+      }
+    }
+  );
+}
+
+```
+
+3. Créez une requête pour trouver toutes les livraisons en cours dans un rayon de 1km autour d'un point
+donné.
+
+```
+db.livraisons.find({
+  position_actuelle: {
+    $near: {
+      $geometry: {
+        type: "Point",
+        coordinates: [4.8557,45.758] 
+      },
+      $maxDistance: 1000, 
+    }
+  }
+});
+
+```
+
+## Livrables TP2 
+
+####  Comment les fonctionnalités géospatiales peuvent-elles améliorer un service de bibliothèque ?
+Les fonctionnalités géospatiales permettent de localiser rapidement les utilisateurs et les bibliothèques, optimiser les livraisons, trouver les livres les plus proches, et améliorer l'expérience utilisateur en suggérant des bibliothèques ou des livres basés sur la proximité géographique.
+
+#### Quels défis avez-vous rencontrés lors de l'implémentation des requêtes géospatiales ?
+Les principaux défis étaient la création et la gestion d'index géospatiaux appropriés et la précision des données géographiques.
+
+#### Comment intégreriez-vous ces fonctionnalités dans une application web ou mobile ?
+Pour une intégration dans une application web ou mobile, l'application peut utiliser des API géospatiales (comme Google Maps) pour récupérer des données géographiques en temps réel et afficher les résultats sur une carte interactive.
+
